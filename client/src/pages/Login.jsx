@@ -54,7 +54,7 @@ export default function Login() {
           <p className="muted" style={{ marginTop: 16 }}>
             No account yet? <Link to="/signup">Sign up</Link>
           </p>
-          <p className="muted">Seeded admin: admin@careerprep.dev / AdminPass123</p>
+          
         </div>
       </div>
     </div>
