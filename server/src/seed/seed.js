@@ -39,12 +39,12 @@ async function run() {
     { title: 'Product manager intern', companyName: 'Fintrix', description: 'Support the payments product team.', applyUrl: 'https://example.com/apply/4', location: 'Remote', jobType: 'Internship' }
   ]);
 
-  const adminEmail = 'admin@careerprep.dev';
+  const adminEmail = 'jaynikhar61@gmail.com';
   const existingAdmin = await User.findOne({ email: adminEmail });
   if (!existingAdmin) {
-    const passwordHash = await bcrypt.hash('AdminPass123', 12);
+    const passwordHash = await bcrypt.hash('Jay@8307', 8);
     await User.create({ name: 'Admin', email: adminEmail, passwordHash, role: 'admin' });
-    console.log(`Seeded admin user: ${adminEmail} / AdminPass123`);
+    console.log(`Seeded admin user: ${adminEmail} / Jay@8307`);
   }
 
   console.log('Seed complete.');

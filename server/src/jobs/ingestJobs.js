@@ -3,8 +3,7 @@ import { fetchLiveJobs } from '../services/jobFeed.service.js';
 import { env } from '../config/env.js';
 
 // Runs on a schedule (see scheduler.js). Upserts by externalId so re-runs
-// never create duplicates — safe to run "forever" without the job board
-// growing unbounded with copies of the same posting.
+// never create duplicates.
 export async function ingestJobs() {
   const started = Date.now();
   const jobs = await fetchLiveJobs({ searchTerm: env.jobFeedSearchTerm });

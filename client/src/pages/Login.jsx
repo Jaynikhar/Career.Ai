@@ -30,7 +30,7 @@ export default function Login() {
   return (
     <div className="auth-split">
       <div className="auth-side">
-        <div className="auth-side-mark">CareerPrep AI</div>
+        <div className="auth-side-mark">Career AI</div>
         <div className="auth-side-quote">Prep with the companies you're targeting, track every application, and let the AI agent handle the busywork.</div>
         <div className="auth-side-sub">Company-wise interview questions, a live job board, and resume tailoring — one place to run your search.</div>
       </div>

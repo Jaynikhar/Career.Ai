@@ -32,7 +32,7 @@ export default function Sidebar() {
     <div className="sidebar">
       <div className="sidebar-brand">
         <span className="mark">C</span>
-        CareerPrep AI
+        Career AI
       </div>
 
       <nav className="sidebar-nav">

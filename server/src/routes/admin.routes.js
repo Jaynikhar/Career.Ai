@@ -3,7 +3,8 @@ import {
   listUsers, listSubscriptions, analytics,
   listJobsAdmin, createJob, updateJob, deleteJob,
   createQuestion, listAllQuestions, deleteQuestion,
-  triggerJobIngest, triggerQuestionGeneration
+  triggerJobIngest, triggerQuestionGeneration,
+  listKnownCompanies
 } from '../controllers/admin.controller.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import { requireRole } from '../middleware/role.middleware.js';
@@ -14,6 +15,7 @@ router.get('/users', listUsers);
 router.get('/subscriptions', listSubscriptions);
 router.get('/analytics', analytics);
 router.get('/jobs', listJobsAdmin);
+router.get('/known-companies', listKnownCompanies);
 router.post('/jobs', createJob);
 router.patch('/jobs/:id', updateJob);
 router.delete('/jobs/:id', deleteJob);

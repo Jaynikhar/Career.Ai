@@ -4,6 +4,8 @@ import Job from '../models/Job.js';
 import Question from '../models/Question.js';
 import { ingestJobs } from '../jobs/ingestJobs.js';
 import { generateQuestionsForAllCompanies } from '../jobs/generateQuestions.js';
+import { KNOWN_COMPANIES } from '../data/knownCompanies.js';
+
 
 export async function listUsers(req, res, next) {
   try {
@@ -39,6 +41,13 @@ export async function listJobsAdmin(req, res, next) {
     res.json({ jobs });
   } catch (err) { next(err); }
 }
+
+
+
+export function listKnownCompanies(req, res) {
+  res.json({ companies: KNOWN_COMPANIES });
+}
+
 
 export async function createJob(req, res, next) {
   try {

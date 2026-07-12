@@ -1,19 +1,20 @@
-import { env } from '../config/env.js';
-
-
 // Pulls live job postings from legitimate public job-board APIs — not
-// scraping. Both are free, structured JSON endpoints intended for exactly
-// this kind of aggregation.
+// scraping.
 //
 // Remotive: https://remotive.com/api/remote-jobs — no key required.
 // Arbeitnow: https://www.arbeitnow.com/api/job-board-api — no key required.
+// Adzuna: https://developer.adzuna.com — free API key required, aggregates
+// from a much broader set of sources than the two above, so it's more
+// likely to surface listings from recognizable/larger companies.
+
+import { env } from '../config/env.js';
 
 async function fetchRemotive(searchTerm) {
   const url = `https://remotive.com/api/remote-jobs${searchTerm ? `?search=${encodeURIComponent(searchTerm)}` : ''}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Remotive API error: ${res.status}`);
   const data = await res.json();
-  return (data.jobs || []).map((j) => ({
+  const jobs = (data.jobs || []).map((j) => ({
     title: j.title,
     companyName: j.company_name,
     description: cleanDescription(j.description),
@@ -24,13 +25,15 @@ async function fetchRemotive(searchTerm) {
     source: 'remotive',
     externalId: `remotive:${j.id}`
   }));
+  console.log(`[job-feed] Remotive returned ${jobs.length} raw jobs`);
+  return jobs;
 }
 
 async function fetchArbeitnow() {
   const res = await fetch('https://www.arbeitnow.com/api/job-board-api');
   if (!res.ok) throw new Error(`Arbeitnow API error: ${res.status}`);
   const data = await res.json();
-  return (data.data || []).map((j) => ({
+  const jobs = (data.data || []).map((j) => ({
     title: j.title,
     companyName: j.company_name,
     description: cleanDescription(j.description),
@@ -41,28 +44,43 @@ async function fetchArbeitnow() {
     source: 'arbeitnow',
     externalId: `arbeitnow:${j.slug}`
   }));
+  console.log(`[job-feed] Arbeitnow returned ${jobs.length} raw jobs`);
+  return jobs;
 }
 
-// Turns raw HTML from these feeds into clean, readable plain text:
-// - decodes HTML entities (&amp;, &nbsp;, etc.) instead of leaving them raw
-// - converts block-level tags into line breaks so paragraphs/bullets don't
-//   get squashed into one run-on wall of text
-// - collapses only *excess* whitespace, not all of it
+async function fetchAdzuna(searchTerm) {
+  if (!env.adzunaAppId || !env.adzunaAppKey) {
+    console.log('[job-feed] Adzuna skipped — ADZUNA_APP_ID/ADZUNA_APP_KEY not set');
+    return [];
+  }
+  const what = encodeURIComponent(searchTerm || 'software engineer');
+  const url = `https://api.adzuna.com/v1/api/jobs/${env.adzunaCountry}/search/1?app_id=${env.adzunaAppId}&app_key=${env.adzunaAppKey}&results_per_page=50&what=${what}&content-type=application/json`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Adzuna API error: ${res.status}`);
+  const data = await res.json();
+  const jobs = (data.results || []).map((j) => ({
+    title: j.title,
+    companyName: j.company?.display_name || 'Unknown',
+    description: cleanDescription(j.description),
+    applyUrl: j.redirect_url,
+    location: j.location?.display_name || '',
+    jobType: j.contract_time === 'part_time' ? 'Contract' : 'Full-time',
+    tags: [],
+    source: 'adzuna',
+    externalId: `adzuna:${j.id}`
+  }));
+  console.log(`[job-feed] Adzuna returned ${jobs.length} raw jobs`);
+  return jobs;
+}
+
 function cleanDescription(html) {
   if (!html) return '';
   let text = html
     .replace(/<(p|div|br|li|h[1-6])[^>]*>/gi, '\n')
     .replace(/<\/(p|div|li|h[1-6])>/gi, '\n')
     .replace(/<[^>]*>/g, '');
-
   text = decodeHtmlEntities(text);
-
-  return text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .join('\n')
-    .slice(0, 4000);
+  return text.split('\n').map((line) => line.trim()).filter(Boolean).join('\n').slice(0, 4000);
 }
 
 function decodeHtmlEntities(str) {
@@ -84,18 +102,20 @@ function mapJobType(raw) {
   return 'Full-time';
 }
 
-// Rough English-language filter: counts what fraction of letters fall
-// outside the basic Latin alphabet. Postings in German, Spanish, French,
-// etc. use accented/extended characters heavily enough to trip this, while
-// occasional accented words in English postings (e.g. "café") won't.
 function isLikelyEnglish(text) {
-  if (!text || text.length < 40) return true; // too short to judge, let it through
+  if (!text || text.length < 40) return true;
   const letters = text.replace(/[^a-zA-Z\u00C0-\u024F]/g, '');
   if (letters.length === 0) return true;
   const nonBasicLatin = letters.replace(/[a-zA-Z]/g, '');
   return nonBasicLatin.length / letters.length < 0.08;
 }
 
+// function isRecognizedCompany(companyName) {
+//   if (env.recognizedCompanies === null) return true;
+//   if (!companyName) return false;
+//   const name = companyName.toLowerCase();
+//   return env.recognizedCompanies.some((allowed) => name.includes(allowed));
+// }
 
 function isRecognizedCompany(companyName) {
   if (!companyName) return false;
@@ -104,11 +124,27 @@ function isRecognizedCompany(companyName) {
 }
 
 export async function fetchLiveJobs({ searchTerm } = {}) {
-  const results = await Promise.allSettled([fetchRemotive(searchTerm), fetchArbeitnow()]);
-  const jobs = [];
+  const results = await Promise.allSettled([
+    fetchRemotive(searchTerm),
+    fetchArbeitnow(),
+    fetchAdzuna(searchTerm)
+  ]);
+  const rawJobs = [];
   for (const r of results) {
-    if (r.status === 'fulfilled') jobs.push(...r.value);
-    else console.error('Job feed provider failed:', r.reason?.message);
+    if (r.status === 'fulfilled') rawJobs.push(...r.value);
+    else console.error('[job-feed] provider failed:', r.reason?.message);
   }
-  return jobs.filter((j) => isRecognizedCompany(j.companyName));
+
+  const afterEnglishFilter = rawJobs.filter((j) => isLikelyEnglish(j.title) && isLikelyEnglish(j.description));
+  const afterCompanyFilter = afterEnglishFilter.filter((j) => isRecognizedCompany(j.companyName));
+
+  console.log(`[job-feed] raw=${rawJobs.length} → after language filter=${afterEnglishFilter.length} → after recognized-company filter=${afterCompanyFilter.length}`);
+  if (rawJobs.length > 0 && afterCompanyFilter.length === 0) {
+    for (const providerName of ['remotive', 'arbeitnow', 'adzuna']) {
+      const sample = [...new Set(rawJobs.filter((j) => j.source === providerName).slice(0, 8).map((j) => j.companyName))];
+      if (sample.length > 0) console.log(`[job-feed] sample from ${providerName}: ${sample.join(', ')}`);
+    }
+  }
+
+  return afterCompanyFilter;
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { ExternalLink, Check } from 'lucide-react';
 import { api } from '../api/client.js';
 
 export default function JobBoard() {
@@ -6,6 +7,7 @@ export default function JobBoard() {
   const [search, setSearch] = useState('');
   const [error, setError] = useState('');
   const [appliedIds, setAppliedIds] = useState(new Set());
+  const [expandedIds, setExpandedIds] = useState(new Set());
 
   useEffect(() => {
     api.get(`/jobs${search ? `?search=${encodeURIComponent(search)}` : ''}`)
@@ -22,6 +24,15 @@ export default function JobBoard() {
     }
   }
 
+  function toggleExpanded(id) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   return (
     <div className="main">
       <p className="muted" style={{ marginBottom: 16 }}>Roles from companies actively hiring right now.</p>
@@ -32,21 +43,35 @@ export default function JobBoard() {
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
-      {jobs.map((job) => (
-        <div className="card" key={job._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontWeight: 600 }}>{job.title}</div>
-            <div className="muted">{job.companyName} · {job.location} · {job.jobType}</div>
-            <p style={{ marginTop: 8, maxWidth: 500 }}>{job.description}</p>
+      {jobs.map((job) => {
+        const expanded = expandedIds.has(job._id);
+        return (
+          <div className="card" key={job._id}>
+            <div style={{ fontWeight: 600, fontSize: 15 }}>{job.title}</div>
+            <div className="muted" style={{ marginTop: 2 }}>{job.companyName} · {job.location} · {job.jobType}</div>
+
+            {job.description && (
+              <>
+                <p className={`job-desc${expanded ? '' : ' job-desc-clamped'}`}>{job.description}</p>
+                <button className="job-desc-toggle" onClick={() => toggleExpanded(job._id)}>
+                  {expanded ? 'Show less' : 'Show more'}
+                </button>
+              </>
+            )}
+
+            <div className="job-card-actions">
+              <a href={job.applyUrl} target="_blank" rel="noreferrer" className="btn secondary">
+                <ExternalLink size={14} aria-hidden="true" />
+                View posting
+              </a>
+              <button className="btn gold" disabled={appliedIds.has(job._id)} onClick={() => apply(job)}>
+                {appliedIds.has(job._id) && <Check size={14} aria-hidden="true" />}
+                {appliedIds.has(job._id) ? 'Tracked' : 'Track application'}
+              </button>
+            </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
-            <a href={job.applyUrl} target="_blank" rel="noreferrer" className="btn secondary">View posting</a>
-            <button className="btn gold" disabled={appliedIds.has(job._id)} onClick={() => apply(job)}>
-              {appliedIds.has(job._id) ? 'Tracked' : 'Track application'}
-            </button>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

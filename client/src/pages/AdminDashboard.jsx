@@ -19,6 +19,11 @@ export default function AdminDashboard() {
   const [qDifficulty, setQDifficulty] = useState('Medium');
   const [qContent, setQContent] = useState('');
   const [qBusy, setQBusy] = useState(false);
+  const [knownCompanies, setKnownCompanies] = useState([]);
+  const [quickCompany, setQuickCompany] = useState('');
+  const [quickTitle, setQuickTitle] = useState('');
+  const [quickBusy, setQuickBusy] = useState(false);
+
 
   function loadAll() {
     api.get('/admin/analytics').then((d) => setAnalytics(d)).catch((e) => setError(e.message));
@@ -26,6 +31,10 @@ export default function AdminDashboard() {
     api.get('/admin/subscriptions').then((d) => setSubs(d.subscriptions)).catch((e) => setError(e.message));
     api.get('/admin/questions').then((d) => setQuestions(d.questions)).catch((e) => setError(e.message));
     api.get('/admin/jobs').then((d) => setJobs(d.jobs)).catch((e) => setError(e.message));
+    api.get('/admin/known-companies').then((d) => {
+      setKnownCompanies(d.companies);
+      if (d.companies[0]) setQuickCompany(d.companies[0].name);
+    }).catch((e) => setError(e.message));
     api.get('/companies').then((d) => {
       setCompanies(d.companies);
       if (d.companies[0] && !qCompanyId) setQCompanyId(d.companies[0]._id);
@@ -45,6 +54,30 @@ export default function AdminDashboard() {
       setError(err.message);
     } finally {
       setIngestBusy(false);
+    }
+  }
+
+  async function quickAddJob(e) {
+    e.preventDefault();
+    if (!quickCompany || !quickTitle.trim()) return;
+    const company = knownCompanies.find((c) => c.name === quickCompany);
+    setQuickBusy(true);
+    setError('');
+    try {
+      await api.post('/admin/jobs', {
+        title: quickTitle.trim(),
+        companyName: company.name,
+        description: `Posted directly on ${company.name}'s official careers site. Click "View posting" to see full details and apply.`,
+        applyUrl: company.careersUrl,
+        location: 'Various',
+        jobType: 'Full-time'
+      });
+      setQuickTitle('');
+      loadAll();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setQuickBusy(false);
     }
   }
 
@@ -153,7 +186,31 @@ export default function AdminDashboard() {
           )}
         </div>
       </div>
-
+      
+      <h3 style={{ marginBottom: 10 }}>Quick add — known companies</h3>
+      <p className="muted" style={{ marginBottom: 12 }}>
+        Free job-board APIs don't carry direct postings from large companies like these (confirmed — tested against three providers). This links straight to their real careers page instead of guessing at a fake listing.
+      </p>
+      <form className="card" onSubmit={quickAddJob} style={{ marginBottom: 24 }}>
+        <div className="grid grid-2" style={{ marginBottom: 12 }}>
+          <div>
+            <label>Company</label>
+            <select className="input" value={quickCompany} onChange={(e) => setQuickCompany(e.target.value)}>
+              {knownCompanies.map((c) => (
+                <option key={c.name} value={c.name}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label>Role title</label>
+            <input className="input" value={quickTitle} onChange={(e) => setQuickTitle(e.target.value)} placeholder="e.g. Software Engineer II" />
+          </div>
+        </div>
+        <button className="btn gold" type="submit" disabled={quickBusy || !quickTitle.trim()}>
+          {quickBusy ? 'Adding...' : 'Add job'}
+        </button>
+      </form>
+    
       <h3 style={{ marginBottom: 10 }}>Add a question manually</h3>
       <form className="card" onSubmit={addQuestion} style={{ marginBottom: 24 }}>
         <div className="grid grid-2" style={{ marginBottom: 12 }}>
