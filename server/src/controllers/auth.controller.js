@@ -10,7 +10,15 @@ function signTokens(user) {
 }
 
 function cookieOpts() {
-  return { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production' };
+  const isProduction = process.env.NODE_ENV === 'production';
+  return {
+    httpOnly: true,
+    // 'none' is required for cookies to be sent cross-domain (your frontend
+    // and backend are on different domains once deployed). Browsers require
+    // secure:true whenever sameSite is 'none', so both must flip together.
+    sameSite: isProduction ? 'none' : 'lax',
+    secure: isProduction
+  };
 }
 
 export async function signup(req, res, next) {
@@ -68,6 +76,6 @@ export async function me(req, res, next) {
 }
 
 export async function logout(req, res) {
-  res.clearCookie('accessToken');
+  res.clearCookie('accessToken', cookieOpts());
   res.json({ message: 'Logged out.' });
 }
